@@ -4,10 +4,42 @@ import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const WEEK_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
+// 일정(이벤트) 정보 예시
+const EVENTS = [
+  {
+    id: "1",
+    date: "2025-11-17",
+    title: "고객 미팅",
+    detail: "강남역 2시, 제안서 리뷰",
+    time: "14:00",
+  },
+  {
+    id: "2",
+    date: "2025-11-17",
+    title: "현장 점검",
+    detail: "구로디지털단지 현장 — 장비 설치 상태 확인 및 담당자 면담",
+    time: "14:00",
+  },
+  {
+    id: "3",
+    date: "2025-11-18",
+    title: "팀 회의",
+    detail: "외근 일정 공유 및 조율",
+    time: "09:00",
+  },
+];
+
 // 해당 달 일수
 function getDaysInMonth(year: number, month: number) {
   // month: 0~11
   return new Date(year, month + 1, 0).getDate();
+}
+
+// 날짜를 "YYYY-MM-DD"로 변환
+function formatDate(year: number, month: number, day: number) {
+  const mm = String(month + 1).padStart(2, "0");
+  const dd = String(day).padStart(2, "0");
+  return `${year}-${mm}-${dd}`;
 }
 
 // 달력 셀 배열 만들기 (한 달 전체를 1차원 배열로)
@@ -15,7 +47,6 @@ function createCalendarCells(year: number, month: number): (number | null)[] {
   const firstDay = new Date(year, month, 1);
   const firstWeekday = firstDay.getDay(); // 0=일, 6=토
   const daysInMonth = getDaysInMonth(year, month);
-  console.log(firstDay, firstWeekday);
 
   const cells: (number | null)[] = [];
 
@@ -33,7 +64,6 @@ function createCalendarCells(year: number, month: number): (number | null)[] {
   while (cells.length % 7 !== 0) {
     cells.push(null);
   }
-  console.log(cells);
   return cells;
 }
 
@@ -54,9 +84,19 @@ export default function BasicCalendarScreen() {
     for (let i = 0; i < calendarCells.length; i += 7) {
       result.push(calendarCells.slice(i, i + 7));
     }
-    console.log(result);
     return result;
   }, [calendarCells]);
+
+  // 날짜별 이벤트 묶기 (빠른 조회용)
+  const eventsByDateMap = useMemo(() => {
+    // EVENTS 타입 맞춰서 any 대신 typeof EVENTS 사용
+    const map: Record<string, (typeof EVENTS)[number][]> = {};
+    EVENTS.forEach((ev) => {
+      if (!map[ev.date]) map[ev.date] = [];
+      map[ev.date].push(ev);
+    });
+    return map;
+  }, []);
 
   const goPrevMonth = () => {
     if (month === 0) {
@@ -108,15 +148,39 @@ export default function BasicCalendarScreen() {
           <View style={styles.calendarGrid}>
             {weeks.map((week, weekIndex) => (
               <View key={weekIndex} style={styles.weekRowCells}>
-                {week.map((day, index) => (
-                  <View key={index} style={styles.dayCell}>
-                    <Text
-                      style={[styles.dayText, day === null && styles.dayEmpty]}
-                    >
-                      {day ?? ""}
-                    </Text>
-                  </View>
-                ))}
+                {week.map((day, index) => {
+                  const dateKey =
+                    day !== null ? formatDate(year, month, day) : null;
+                  console.log(dateKey);
+
+                  // 해당 날짜에 이벤트가 있는지 여부
+                  const hasEvent =
+                    !!dateKey && !!eventsByDateMap[dateKey]?.length;
+
+                  // 오늘 날짜 여부
+                  const isToday =
+                    day &&
+                    today.getFullYear() === year &&
+                    today.getMonth() === month &&
+                    today.getDate() === day;
+
+                  return (
+                    <View key={index} style={[styles.dayCell]}>
+                      <Text
+                        style={[
+                          styles.dayText,
+                          !!isToday && styles.todayCell,
+                          day === null && styles.dayEmpty,
+                        ]}
+                      >
+                        {day ?? ""}
+                      </Text>
+
+                      {/* 이벤트가 있으면 점 표시 */}
+                      {hasEvent && <View style={styles.eventDot} />}
+                    </View>
+                  );
+                })}
               </View>
             ))}
           </View>
@@ -178,4 +242,22 @@ const styles = StyleSheet.create({
   },
   dayText: { fontSize: 14 },
   dayEmpty: { color: "#ccc" },
+
+  // 이벤트 표시
+  eventDot: {
+    position: "absolute",
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    bottom: 4,
+    backgroundColor: "#4A90E2",
+  },
+
+  // 오늘 날짜
+  todayCell: {
+    padding: 3,
+    color: "white",
+    backgroundColor: "#ff6b6b",
+    borderRadius: "50%",
+  },
 });
