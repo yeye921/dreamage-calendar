@@ -17,8 +17,8 @@ const EVENTS = [
     id: "2",
     date: "2025-11-17",
     title: "현장 점검",
-    detail: "수원 현장, 안전 체크리스트 확인",
-    time: "10:00",
+    detail: "구로디지털단지 현장 — 장비 설치 상태 확인 및 담당자 면담",
+    time: "14:00",
   },
   {
     id: "3",
@@ -157,11 +157,19 @@ export default function BasicCalendarScreen() {
                   const hasEvent =
                     !!dateKey && !!eventsByDateMap[dateKey]?.length;
 
+                  // 오늘 날짜 여부
+                  const isToday =
+                    day &&
+                    today.getFullYear() === year &&
+                    today.getMonth() === month &&
+                    today.getDate() === day;
+
                   return (
-                    <View key={index} style={styles.dayCell}>
+                    <View key={index} style={[styles.dayCell]}>
                       <Text
                         style={[
                           styles.dayText,
+                          !!isToday && styles.todayCell,
                           day === null && styles.dayEmpty,
                         ]}
                       >
@@ -237,10 +245,19 @@ const styles = StyleSheet.create({
 
   // 이벤트 표시
   eventDot: {
+    position: "absolute",
     width: 6,
     height: 6,
     borderRadius: 3,
-    marginTop: 3,
+    bottom: 4,
+    backgroundColor: "#4A90E2",
+  },
+
+  // 오늘 날짜
+  todayCell: {
+    padding: 3,
+    color: "white",
     backgroundColor: "#ff6b6b",
+    borderRadius: "50%",
   },
 });
