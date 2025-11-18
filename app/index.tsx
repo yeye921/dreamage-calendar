@@ -1,5 +1,14 @@
 import React, { useMemo, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  FlatList,
+  GestureResponderEvent,
+  PanResponder,
+  PanResponderGestureState,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 
 const WEEK_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
@@ -72,6 +81,11 @@ export default function BasicCalendarScreen() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
 
+  // 선택된 날짜 ("YYYY-MM-DD")
+  const [selectedDate, setSelectedDate] = useState<string | null>(
+    formatDate(today.getFullYear(), today.getMonth(), today.getDate())
+  );
+
   // 현재 year, month 기준 달력 셀 (1차원 배열)
   const calendarCells = useMemo(
     () => createCalendarCells(year, month),
@@ -87,9 +101,8 @@ export default function BasicCalendarScreen() {
     return result;
   }, [calendarCells]);
 
-  // 날짜별 이벤트 묶기 (빠른 조회용)
+  // 날짜별 이벤트 묶기
   const eventsByDateMap = useMemo(() => {
-    // EVENTS 타입 맞춰서 any 대신 typeof EVENTS 사용
     const map: Record<string, (typeof EVENTS)[number][]> = {};
     EVENTS.forEach((ev) => {
       if (!map[ev.date]) map[ev.date] = [];
@@ -97,6 +110,12 @@ export default function BasicCalendarScreen() {
     });
     return map;
   }, []);
+
+  // 선택된 날짜의 일정 목록
+  const selectedDateEvents = useMemo(() => {
+    if (!selectedDate) return [];
+    return eventsByDateMap[selectedDate] || [];
+  }, [selectedDate, eventsByDateMap]);
 
   const goPrevMonth = () => {
     if (month === 0) {
@@ -115,6 +134,38 @@ export default function BasicCalendarScreen() {
       setMonth((m) => m + 1);
     }
   };
+
+  // 날짜 클릭 시 선택 처리
+  const handlePressDay = (day: number | null) => {
+    if (!day) return;
+    const dateKey = formatDate(year, month, day);
+    setSelectedDate(dateKey);
+  };
+
+  // 스와이프 제스처 추가 (왼/오른쪽)
+  const SWIPE_THRESHOLD = 50; // 얼마나 많이 밀었을 때 “스와이프”로 볼지
+
+  const panResponder = PanResponder.create({
+    onMoveShouldSetPanResponder: (
+      e: GestureResponderEvent,
+      gestureState: PanResponderGestureState
+    ) => {
+      const { dx, dy } = gestureState;
+      return Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10;
+    },
+    onPanResponderRelease: (
+      e: GestureResponderEvent,
+      gestureState: PanResponderGestureState
+    ) => {
+      const { dx } = gestureState;
+
+      if (dx > SWIPE_THRESHOLD) {
+        goPrevMonth();
+      } else if (dx < -SWIPE_THRESHOLD) {
+        goNextMonth();
+      }
+    },
+  });
 
   return (
     <SafeAreaProvider>
@@ -136,53 +187,89 @@ export default function BasicCalendarScreen() {
           </View>
 
           {/* 요일 헤더 */}
-          <View style={styles.weekRow}>
-            {WEEK_LABELS.map((label) => (
-              <Text key={label} style={styles.weekLabel}>
-                {label}
-              </Text>
-            ))}
+          <View style={styles.swipeContainer} {...panResponder.panHandlers}>
+            <View style={styles.weekRow}>
+              {WEEK_LABELS.map((label) => (
+                <Text key={label} style={styles.weekLabel}>
+                  {label}
+                </Text>
+              ))}
+            </View>
+
+            {/* 달력 그리드 (주 단위 + 셀) */}
+            <View style={styles.calendarGrid}>
+              {weeks.map((week, weekIndex) => (
+                <View key={weekIndex} style={styles.weekRowCells}>
+                  {week.map((day, index) => {
+                    const dateKey =
+                      day !== null ? formatDate(year, month, day) : null;
+
+                    // 해당 날짜에 이벤트가 있는지 여부
+                    const hasEvent =
+                      !!dateKey && !!eventsByDateMap[dateKey]?.length;
+
+                    // 오늘 날짜 여부
+                    const isToday =
+                      day &&
+                      today.getFullYear() === year &&
+                      today.getMonth() === month &&
+                      today.getDate() === day;
+
+                    // 선택된 날짜 여부
+                    const isSelected = !!dateKey && selectedDate === dateKey;
+
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.dayCell}
+                        activeOpacity={day ? 0.7 : 1}
+                        onPress={() => handlePressDay(day)}
+                        disabled={!day}
+                      >
+                        <Text
+                          style={[
+                            styles.dayText,
+                            !!isToday && styles.todayCell,
+                            !isToday && isSelected && styles.selectedCell,
+                            day === null && styles.dayEmpty,
+                          ]}
+                        >
+                          {day ?? ""}
+                        </Text>
+
+                        {/* 이벤트가 있으면 점 표시 */}
+                        {hasEvent && <View style={styles.eventDot} />}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ))}
+            </View>
           </View>
 
-          {/* 달력 그리드 (주 단위 + 셀) */}
-          <View style={styles.calendarGrid}>
-            {weeks.map((week, weekIndex) => (
-              <View key={weekIndex} style={styles.weekRowCells}>
-                {week.map((day, index) => {
-                  const dateKey =
-                    day !== null ? formatDate(year, month, day) : null;
-                  console.log(dateKey);
+          {/* 선택된 날짜의 일정 목록 */}
+          <View style={styles.listContainer}>
+            <Text style={styles.sectionTitle}>
+              {selectedDate ? `${selectedDate} 일정` : "날짜를 선택하세요"}
+            </Text>
 
-                  // 해당 날짜에 이벤트가 있는지 여부
-                  const hasEvent =
-                    !!dateKey && !!eventsByDateMap[dateKey]?.length;
-
-                  // 오늘 날짜 여부
-                  const isToday =
-                    day &&
-                    today.getFullYear() === year &&
-                    today.getMonth() === month &&
-                    today.getDate() === day;
-
-                  return (
-                    <View key={index} style={[styles.dayCell]}>
-                      <Text
-                        style={[
-                          styles.dayText,
-                          !!isToday && styles.todayCell,
-                          day === null && styles.dayEmpty,
-                        ]}
-                      >
-                        {day ?? ""}
-                      </Text>
-
-                      {/* 이벤트가 있으면 점 표시 */}
-                      {hasEvent && <View style={styles.eventDot} />}
-                    </View>
-                  );
-                })}
-              </View>
-            ))}
+            {selectedDateEvents.length === 0 ? (
+              <Text style={styles.emptyText}>일정이 없습니다.</Text>
+            ) : (
+              <FlatList
+                data={selectedDateEvents}
+                keyExtractor={(item) => item.id}
+                renderItem={({ item }) => (
+                  <View style={styles.eventItem}>
+                    <Text style={styles.eventTitle}>
+                      {item.time ? `${item.time} ` : ""}
+                      {item.title}
+                    </Text>
+                    <Text style={styles.eventDetail}>{item.detail}</Text>
+                  </View>
+                )}
+              />
+            )}
           </View>
         </View>
       </SafeAreaView>
@@ -206,6 +293,11 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
   },
   navBtn: { fontSize: 20, padding: 8 },
+
+  // 스와이프 영역 (요일 + 달력 전체 감싸는 용도)
+  swipeContainer: {
+    flex: 0, // 높이는 내용만큼
+  },
 
   weekRow: {
     flexDirection: "row",
@@ -255,9 +347,53 @@ const styles = StyleSheet.create({
 
   // 오늘 날짜
   todayCell: {
-    padding: 3,
+    width: 25,
+    height: 25,
+    textAlign: "center",
+    lineHeight: 25,
     color: "white",
     backgroundColor: "#ff6b6b",
     borderRadius: "50%",
+  },
+
+  // 선택된 날짜
+  selectedCell: {
+    width: 25,
+    height: 25,
+    textAlign: "center",
+    lineHeight: 25,
+    color: "white",
+    backgroundColor: "#999",
+    borderRadius: "50%",
+  },
+
+  // 아래 일정 목록
+  listContainer: {
+    flex: 1,
+    marginTop: 20,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "#999",
+  },
+  eventItem: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#eee",
+    marginBottom: 8,
+    backgroundColor: "#eeeeee", // #fff
+  },
+  eventTitle: {
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  eventDetail: {
+    color: "#555",
+    fontSize: 13,
   },
 });
