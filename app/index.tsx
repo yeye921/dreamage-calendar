@@ -1,3 +1,6 @@
+import { WEEK_LABELS } from "@/constants/date";
+import formatKoreanDate from "@/utils/formatKoreanDate";
+import { useRouter } from "expo-router";
 import React, { useMemo, useState } from "react";
 import {
   FlatList,
@@ -9,12 +12,18 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-const WEEK_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+export type EventType = {
+  id: string;
+  date: string;
+  title: string;
+  detail: string;
+  time?: string;
+};
 
 // 일정(이벤트) 정보 예시
-const EVENTS = [
+const EVENTS: EventType[] = [
   {
     id: "1",
     date: "2025-11-17",
@@ -34,7 +43,7 @@ const EVENTS = [
     date: "2025-11-18",
     title: "팀 회의",
     detail: "외근 일정 공유 및 조율",
-    time: "09:00",
+    time: "09:30",
   },
 ];
 
@@ -76,7 +85,8 @@ function createCalendarCells(year: number, month: number): (number | null)[] {
   return cells;
 }
 
-export default function BasicCalendarScreen() {
+export default function CalendarScreen() {
+  const router = useRouter();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
@@ -143,7 +153,7 @@ export default function BasicCalendarScreen() {
   };
 
   // 스와이프 제스처 추가 (왼/오른쪽)
-  const SWIPE_THRESHOLD = 50; // 얼마나 많이 밀었을 때 “스와이프”로 볼지
+  const SWIPE_THRESHOLD = 50;
 
   const panResponder = PanResponder.create({
     onMoveShouldSetPanResponder: (
@@ -168,112 +178,146 @@ export default function BasicCalendarScreen() {
   });
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.container}>
-          {/* 헤더: 년/월 + 이전/다음 버튼 */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={goPrevMonth}>
-              <Text style={styles.navBtn}>〈</Text>
-            </TouchableOpacity>
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.container}>
+        {/* 헤더: 년/월 + 이전/다음 버튼 */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={goPrevMonth}>
+            <Text style={styles.navBtn}>〈</Text>
+          </TouchableOpacity>
 
-            <Text style={styles.headerTitle}>
-              {year}년 {month + 1}월
-            </Text>
+          <Text style={styles.headerTitle}>
+            {year}년 {month + 1}월
+          </Text>
 
-            <TouchableOpacity onPress={goNextMonth}>
-              <Text style={styles.navBtn}>〉</Text>
-            </TouchableOpacity>
+          <TouchableOpacity onPress={goNextMonth}>
+            <Text style={styles.navBtn}>〉</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* 요일 헤더 */}
+        <View style={styles.swipeContainer} {...panResponder.panHandlers}>
+          <View style={styles.weekRow}>
+            {WEEK_LABELS.map((label) => (
+              <Text key={label} style={styles.weekLabel}>
+                {label}
+              </Text>
+            ))}
           </View>
 
-          {/* 요일 헤더 */}
-          <View style={styles.swipeContainer} {...panResponder.panHandlers}>
-            <View style={styles.weekRow}>
-              {WEEK_LABELS.map((label) => (
-                <Text key={label} style={styles.weekLabel}>
-                  {label}
-                </Text>
-              ))}
-            </View>
+          {/* 달력 그리드 (주 단위 + 셀) */}
+          <View style={styles.calendarGrid}>
+            {weeks.map((week, weekIndex) => (
+              <View key={weekIndex} style={styles.weekRowCells}>
+                {week.map((day, index) => {
+                  const dateKey =
+                    day !== null ? formatDate(year, month, day) : null;
 
-            {/* 달력 그리드 (주 단위 + 셀) */}
-            <View style={styles.calendarGrid}>
-              {weeks.map((week, weekIndex) => (
-                <View key={weekIndex} style={styles.weekRowCells}>
-                  {week.map((day, index) => {
-                    const dateKey =
-                      day !== null ? formatDate(year, month, day) : null;
+                  // 해당 날짜에 이벤트가 있는지 여부
+                  const hasEvent =
+                    !!dateKey && !!eventsByDateMap[dateKey]?.length;
 
-                    // 해당 날짜에 이벤트가 있는지 여부
-                    const hasEvent =
-                      !!dateKey && !!eventsByDateMap[dateKey]?.length;
+                  // 오늘 날짜 여부
+                  const isToday =
+                    day &&
+                    today.getFullYear() === year &&
+                    today.getMonth() === month &&
+                    today.getDate() === day;
 
-                    // 오늘 날짜 여부
-                    const isToday =
-                      day &&
-                      today.getFullYear() === year &&
-                      today.getMonth() === month &&
-                      today.getDate() === day;
+                  // 선택된 날짜 여부
+                  const isSelected = !!dateKey && selectedDate === dateKey;
 
-                    // 선택된 날짜 여부
-                    const isSelected = !!dateKey && selectedDate === dateKey;
-
-                    return (
-                      <TouchableOpacity
-                        key={index}
-                        style={styles.dayCell}
-                        activeOpacity={day ? 0.7 : 1}
-                        onPress={() => handlePressDay(day)}
-                        disabled={!day}
+                  return (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.dayCell}
+                      activeOpacity={day ? 0.7 : 1}
+                      onPress={() => handlePressDay(day)}
+                      disabled={!day}
+                    >
+                      <Text
+                        style={[
+                          styles.dayText,
+                          !!isToday && styles.todayCell,
+                          !isToday && isSelected && styles.selectedCell,
+                          day === null && styles.dayEmpty,
+                        ]}
                       >
-                        <Text
-                          style={[
-                            styles.dayText,
-                            !!isToday && styles.todayCell,
-                            !isToday && isSelected && styles.selectedCell,
-                            day === null && styles.dayEmpty,
-                          ]}
-                        >
-                          {day ?? ""}
-                        </Text>
+                        {day ?? ""}
+                      </Text>
 
-                        {/* 이벤트가 있으면 점 표시 */}
-                        {hasEvent && <View style={styles.eventDot} />}
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* 선택된 날짜의 일정 목록 */}
-          <View style={styles.listContainer}>
-            <Text style={styles.sectionTitle}>
-              {selectedDate ? `${selectedDate} 일정` : "날짜를 선택하세요"}
-            </Text>
-
-            {selectedDateEvents.length === 0 ? (
-              <Text style={styles.emptyText}>일정이 없습니다.</Text>
-            ) : (
-              <FlatList
-                data={selectedDateEvents}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
-                  <View style={styles.eventItem}>
-                    <Text style={styles.eventTitle}>
-                      {item.time ? `${item.time} ` : ""}
-                      {item.title}
-                    </Text>
-                    <Text style={styles.eventDetail}>{item.detail}</Text>
-                  </View>
-                )}
-              />
-            )}
+                      {/* 이벤트가 있으면 점 표시 */}
+                      {hasEvent && <View style={styles.eventDot} />}
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            ))}
           </View>
         </View>
-      </SafeAreaView>
-    </SafeAreaProvider>
+
+        {/* 선택된 날짜의 일정 목록 */}
+        <View style={styles.listContainer}>
+          <Text style={styles.sectionTitle}>
+            {selectedDate
+              ? `${formatKoreanDate(selectedDate)} 일정`
+              : "날짜를 선택하세요"}
+          </Text>
+
+          {selectedDateEvents.length === 0 ? (
+            <Text style={styles.emptyText}>일정이 없습니다.</Text>
+          ) : (
+            <FlatList
+              data={selectedDateEvents}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.eventListContent} // 리스트 전체 여백
+              ItemSeparatorComponent={() => (
+                <View style={styles.eventSeparator} />
+              )} //  카드 사이 간격
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/event-detail",
+                      params: {
+                        id: item.id,
+                        date: item.date,
+                        title: item.title,
+                        detail: item.detail,
+                        time: item.time ?? "",
+                      },
+                    })
+                  }
+                >
+                  <View style={styles.eventItem}>
+                    {/* 왼쪽 시간 뱃지 */}
+                    <View style={styles.eventTimeBadge}>
+                      <Text style={styles.eventTimeText}>
+                        {item.time ?? "시간"}
+                      </Text>
+                    </View>
+
+                    {/* 가운데 텍스트 영역 */}
+                    <View style={styles.eventTextContainer}>
+                      <Text style={styles.eventTitle} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <Text style={styles.eventDetail} numberOfLines={1}>
+                        {item.detail}
+                      </Text>
+                    </View>
+
+                    {/* 오른쪽 화살표 */}
+                    <Text style={styles.eventChevron}>›</Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+            />
+          )}
+        </View>
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -380,20 +424,70 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#999",
   },
+
+  // FlatList 전체 패딩
+  eventListContent: {
+    paddingBottom: 24,
+  },
+
+  // 아이템 간 간격
+  eventSeparator: {
+    height: 8,
+  },
+
+  // 카드 전체
   eventItem: {
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#eee",
-    marginBottom: 8,
-    backgroundColor: "#eeeeee", // #fff
+    flexDirection: "row",
+    alignItems: "center",
+    margin: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    backgroundColor: "#fff",
+    // 그림자
+    shadowColor: "#000",
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+
+  // 왼쪽 시간 뱃지
+  eventTimeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "#eef3ff",
+    marginRight: 10,
+    minWidth: 52,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  eventTimeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#3b5bdb",
+  },
+
+  // 가운데 텍스트 영역
+  eventTextContainer: {
+    flex: 1,
   },
   eventTitle: {
     fontWeight: "700",
-    marginBottom: 4,
+    marginBottom: 3,
+    fontSize: 14,
+    color: "#222",
   },
   eventDetail: {
-    color: "#555",
-    fontSize: 13,
+    color: "#777",
+    fontSize: 12,
+  },
+
+  // 오른쪽 화살표
+  eventChevron: {
+    marginLeft: 6,
+    fontSize: 18,
+    color: "#ccc",
   },
 });
