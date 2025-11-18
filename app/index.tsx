@@ -5,6 +5,7 @@ import React, { useMemo, useState } from "react";
 import {
   FlatList,
   GestureResponderEvent,
+  Image,
   PanResponder,
   PanResponderGestureState,
   StyleSheet,
@@ -88,6 +89,11 @@ function createCalendarCells(year: number, month: number): (number | null)[] {
 export default function CalendarScreen() {
   const router = useRouter();
   const today = new Date();
+  const todayKey = formatDate(
+    today.getFullYear(),
+    today.getMonth(),
+    today.getDate()
+  );
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
 
@@ -126,6 +132,9 @@ export default function CalendarScreen() {
     if (!selectedDate) return [];
     return eventsByDateMap[selectedDate] || [];
   }, [selectedDate, eventsByDateMap]);
+
+  // 오늘 일정 개수
+  const todaysEventCount = eventsByDateMap[todayKey]?.length ?? 0;
 
   const goPrevMonth = () => {
     if (month === 0) {
@@ -180,6 +189,30 @@ export default function CalendarScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
+        {/* 드림에이지이 로고 + 개인 일정 정보 헤더 */}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryLeft}>
+            <View style={styles.summaryBrandRow}>
+              <Image
+                source={require("@/assets/images/dreamage-logo.png")}
+                style={styles.summaryLogo}
+                resizeMode="contain"
+              />
+              <Text style={styles.summaryBrandName}>드림에이지이</Text>
+            </View>
+
+            <Text style={styles.summaryTitle}>외근 일정</Text>
+            <Text style={styles.summaryText}>
+              김예원님, 오늘 예정된 일정이{" "}
+              <Text style={styles.summaryHighlight}>{todaysEventCount}개</Text>{" "}
+              있습니다.
+            </Text>
+          </View>
+
+          <View style={styles.summaryBadge}>
+            <Text style={styles.summaryBadgeText}>Today</Text>
+          </View>
+        </View>
         {/* 헤더: 년/월 + 이전/다음 버튼 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={goPrevMonth}>
@@ -324,6 +357,47 @@ export default function CalendarScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: "#fff" },
   container: { flex: 1, padding: 16 },
+
+  /*  브랜드 헤더 */
+  brandHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+    paddingVertical: 8,
+  },
+  brandLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  brandLogo: {
+    width: 32,
+    height: 32,
+    marginRight: 10,
+  },
+  brandCompany: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#222",
+  },
+  brandSub: {
+    fontSize: 11,
+    color: "#777",
+    marginTop: 2,
+  },
+  brandRight: {
+    alignItems: "flex-end",
+  },
+  brandGreetingName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#4a6aff",
+    marginBottom: 2,
+  },
+  brandGreetingText: {
+    fontSize: 12,
+    color: "#555",
+  },
 
   header: {
     flexDirection: "row",
@@ -489,5 +563,65 @@ const styles = StyleSheet.create({
     marginLeft: 6,
     fontSize: 18,
     color: "#ccc",
+  },
+
+  summaryCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  summaryLeft: {
+    flex: 1,
+    marginRight: 8,
+  },
+  summaryTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4a6aff",
+    marginBottom: 4,
+  },
+  summaryText: {
+    fontSize: 14,
+    color: "#333",
+  },
+  summaryHighlight: {
+    fontWeight: "700",
+    color: "#ff6b6b",
+  },
+  summaryBadge: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 999,
+    backgroundColor: "#eef3ff",
+  },
+  summaryBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#4a6aff",
+  },
+  summaryBrandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  summaryLogo: {
+    width: 24,
+    height: 24,
+    marginRight: 6,
+  },
+  summaryBrandName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#111",
   },
 });
