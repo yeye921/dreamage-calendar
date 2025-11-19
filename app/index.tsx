@@ -1,6 +1,8 @@
+import { eventsAtom, EventType } from "@/atoms/events";
 import { WEEK_LABELS } from "@/constants/date";
 import formatKoreanDate from "@/utils/formatKoreanDate";
 import { useRouter } from "expo-router";
+import { useAtom } from "jotai";
 import React, { useMemo, useState } from "react";
 import {
   FlatList,
@@ -14,40 +16,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-export type EventType = {
-  id: string;
-  date: string;
-  title: string;
-  detail: string;
-  time?: string;
-};
-
-// 일정(이벤트) 정보 예시
-const EVENTS: EventType[] = [
-  {
-    id: "1",
-    date: "2025-11-17",
-    title: "고객 미팅",
-    detail: "강남역 2시, 제안서 리뷰",
-    time: "14:00",
-  },
-  {
-    id: "2",
-    date: "2025-11-17",
-    title: "현장 점검",
-    detail: "구로디지털단지 현장 — 장비 설치 상태 확인 및 담당자 면담",
-    time: "14:00",
-  },
-  {
-    id: "3",
-    date: "2025-11-18",
-    title: "팀 회의",
-    detail: "외근 일정 공유 및 조율",
-    time: "09:30",
-  },
-];
-
 // 해당 달 일수
 function getDaysInMonth(year: number, month: number) {
   // month: 0~11
@@ -96,6 +64,7 @@ export default function CalendarScreen() {
   );
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
+  const [events] = useAtom(eventsAtom); // 전역 일정
 
   // 선택된 날짜 ("YYYY-MM-DD")
   const [selectedDate, setSelectedDate] = useState<string | null>(
@@ -119,8 +88,8 @@ export default function CalendarScreen() {
 
   // 날짜별 이벤트 묶기
   const eventsByDateMap = useMemo(() => {
-    const map: Record<string, (typeof EVENTS)[number][]> = {};
-    EVENTS.forEach((ev) => {
+    const map: Record<string, EventType[]> = {};
+    events.forEach((ev) => {
       if (!map[ev.date]) map[ev.date] = [];
       map[ev.date].push(ev);
     });
