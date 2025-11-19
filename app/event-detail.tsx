@@ -1,7 +1,11 @@
+import { removeEventAtom } from "@/atoms/events";
 import formatKoreanDate from "@/utils/formatKoreanDate";
 import formatKoreanTime from "@/utils/formatKoreanTime";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { useSetAtom } from "jotai";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function EventDetailScreen() {
   const router = useRouter();
+  const removeEvent = useSetAtom(removeEventAtom);
 
   const params = useLocalSearchParams<{
     id: string;
@@ -21,7 +26,28 @@ export default function EventDetailScreen() {
     time?: string;
   }>();
 
-  const { title, detail, date, time } = params;
+  const { id, title, detail, date, time } = params;
+
+  const handleDelete = () => {
+    if (!id) return;
+
+    Alert.alert(
+      "일정 삭제",
+      "해당 일정을 정말 삭제하시겠습니까?",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: () => {
+            removeEvent(String(id)); // jotai로 삭제
+            router.back(); // 메인으로 돌아가기
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -31,8 +57,17 @@ export default function EventDetailScreen() {
           <TouchableOpacity onPress={() => router.back()}>
             <Text style={styles.backText}>〈 일정 목록</Text>
           </TouchableOpacity>
+
           <Text style={styles.headerTitle}>일정 상세</Text>
-          <View style={{ width: 60 }} />
+
+          {/* 오른쪽 쓰레기통 아이콘 (삭제) */}
+          <TouchableOpacity onPress={handleDelete} disabled={!id}>
+            <Ionicons
+              name="trash-outline"
+              size={20}
+              color={id ? "#ff4d4f" : "#ccc"}
+            />
+          </TouchableOpacity>
         </View>
 
         {/* 내용 카드 */}

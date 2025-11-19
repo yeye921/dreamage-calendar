@@ -1,6 +1,8 @@
+import { eventsAtom, EventType, removeEventAtom } from "@/atoms/events";
 import { WEEK_LABELS } from "@/constants/date";
 import formatKoreanDate from "@/utils/formatKoreanDate";
 import { useRouter } from "expo-router";
+import { useAtom } from "jotai";
 import React, { useMemo, useState } from "react";
 import {
   FlatList,
@@ -14,40 +16,6 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-
-export type EventType = {
-  id: string;
-  date: string;
-  title: string;
-  detail: string;
-  time?: string;
-};
-
-// 일정(이벤트) 정보 예시
-const EVENTS: EventType[] = [
-  {
-    id: "1",
-    date: "2025-11-17",
-    title: "고객 미팅",
-    detail: "강남역 2시, 제안서 리뷰",
-    time: "14:00",
-  },
-  {
-    id: "2",
-    date: "2025-11-17",
-    title: "현장 점검",
-    detail: "구로디지털단지 현장 — 장비 설치 상태 확인 및 담당자 면담",
-    time: "14:00",
-  },
-  {
-    id: "3",
-    date: "2025-11-18",
-    title: "팀 회의",
-    detail: "외근 일정 공유 및 조율",
-    time: "09:30",
-  },
-];
-
 // 해당 달 일수
 function getDaysInMonth(year: number, month: number) {
   // month: 0~11
@@ -96,6 +64,8 @@ export default function CalendarScreen() {
   );
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
+  const [events] = useAtom(eventsAtom); // 전역 일정
+  const [, removeEvent] = useAtom(removeEventAtom);
 
   // 선택된 날짜 ("YYYY-MM-DD")
   const [selectedDate, setSelectedDate] = useState<string | null>(
@@ -119,13 +89,13 @@ export default function CalendarScreen() {
 
   // 날짜별 이벤트 묶기
   const eventsByDateMap = useMemo(() => {
-    const map: Record<string, (typeof EVENTS)[number][]> = {};
-    EVENTS.forEach((ev) => {
+    const map: Record<string, EventType[]> = {};
+    events.forEach((ev) => {
       if (!map[ev.date]) map[ev.date] = [];
       map[ev.date].push(ev);
     });
     return map;
-  }, []);
+  }, [events]);
 
   // 선택된 날짜의 일정 목록
   const selectedDateEvents = useMemo(() => {
@@ -208,11 +178,8 @@ export default function CalendarScreen() {
               있습니다.
             </Text>
           </View>
-
-          <View style={styles.summaryBadge}>
-            <Text style={styles.summaryBadgeText}>Today</Text>
-          </View>
         </View>
+
         {/* 헤더: 년/월 + 이전/다음 버튼 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={goPrevMonth}>
@@ -263,7 +230,10 @@ export default function CalendarScreen() {
                   return (
                     <TouchableOpacity
                       key={index}
-                      style={styles.dayCell}
+                      style={[
+                        styles.dayCell,
+                        isSelected && styles.selectedCell,
+                      ]}
                       activeOpacity={day ? 0.7 : 1}
                       onPress={() => handlePressDay(day)}
                       disabled={!day}
@@ -272,7 +242,7 @@ export default function CalendarScreen() {
                         style={[
                           styles.dayText,
                           !!isToday && styles.todayCell,
-                          !isToday && isSelected && styles.selectedCell,
+
                           day === null && styles.dayEmpty,
                         ]}
                       >
@@ -291,11 +261,27 @@ export default function CalendarScreen() {
 
         {/* 선택된 날짜의 일정 목록 */}
         <View style={styles.listContainer}>
-          <Text style={styles.sectionTitle}>
-            {selectedDate
-              ? `${formatKoreanDate(selectedDate)} 일정`
-              : "날짜를 선택하세요"}
-          </Text>
+          <View style={styles.listHeaderRow}>
+            <Text style={styles.sectionTitle}>
+              {selectedDate
+                ? `${formatKoreanDate(selectedDate)} 일정`
+                : "날짜를 선택하세요"}
+            </Text>
+
+            {/* 새 일정 추가 버튼 (event-form 화면으로 이동) */}
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/event-form",
+                  params: {
+                    date: selectedDate ?? todayKey,
+                  },
+                })
+              }
+            >
+              <Text style={styles.addButtonText}>+ 새 일정</Text>
+            </TouchableOpacity>
+          </View>
 
           {selectedDateEvents.length === 0 ? (
             <Text style={styles.emptyText}>일정이 없습니다.</Text>
@@ -476,19 +462,25 @@ const styles = StyleSheet.create({
 
   // 선택된 날짜
   selectedCell: {
-    width: 25,
-    height: 25,
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
     textAlign: "center",
-    lineHeight: 25,
     color: "white",
-    backgroundColor: "#999",
-    borderRadius: "50%",
+    backgroundColor: "#e2e2e2",
   },
 
   // 아래 일정 목록
   listContainer: {
     flex: 1,
     marginTop: 20,
+  },
+  listHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
   },
   sectionTitle: {
     fontSize: 16,
@@ -497,6 +489,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: "#999",
+  },
+  addButtonText: {
+    fontSize: 13,
+    color: "#4a6aff",
+    fontWeight: "600",
   },
 
   // FlatList 전체 패딩
@@ -597,17 +594,6 @@ const styles = StyleSheet.create({
   summaryHighlight: {
     fontWeight: "700",
     color: "#ff6b6b",
-  },
-  summaryBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    backgroundColor: "#eef3ff",
-  },
-  summaryBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#4a6aff",
   },
   summaryBrandRow: {
     flexDirection: "row",

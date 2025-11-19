@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { Provider as JotaiProvider } from "jotai";
 import "react-native-reanimated";
 
 export const unstable_settings = {
@@ -6,5 +7,9 @@ export const unstable_settings = {
 };
 
 export default function RootLayout() {
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <JotaiProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </JotaiProvider>
+  );
 }
