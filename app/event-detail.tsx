@@ -1,14 +1,16 @@
-import { removeEventAtom } from "@/atoms/events";
+import { eventsAtom, removeEventAtom, updateEventAtom } from "@/atoms/events";
 import formatKoreanDate from "@/utils/formatKoreanDate";
 import formatKoreanTime from "@/utils/formatKoreanTime";
-import { Ionicons } from "@expo/vector-icons";
+import { Feather } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { useSetAtom } from "jotai";
+import { useAtomValue, useSetAtom } from "jotai";
+import { useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -16,7 +18,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function EventDetailScreen() {
   const router = useRouter();
-  const removeEvent = useSetAtom(removeEventAtom);
 
   const params = useLocalSearchParams<{
     id: string;
@@ -27,6 +28,50 @@ export default function EventDetailScreen() {
   }>();
 
   const { id, title, detail, date, time } = params;
+
+  // jotai 전역 상태
+  const events = useAtomValue(eventsAtom);
+  const updateEvent = useSetAtom(updateEventAtom);
+  const removeEvent = useSetAtom(removeEventAtom);
+
+  // 전역에서 최신 이벤트 정보 가져오기 (params보다 우선)
+  const currentEvent = events.find((ev) => ev.id === id);
+
+  // 편집용 로컬 state
+  const [isEditing, setIsEditing] = useState(false);
+  const [titleInput, setTitleInput] = useState(
+    currentEvent?.title ?? (title as string) ?? ""
+  );
+  const [timeInput, setTimeInput] = useState(
+    currentEvent?.time ?? (time as string) ?? ""
+  );
+  const [detailInput, setDetailInput] = useState(
+    currentEvent?.detail ?? (detail as string) ?? ""
+  );
+
+  // 전역 이벤트가 바뀌었을 때 동기화
+  useEffect(() => {
+    if (currentEvent) {
+      setTitleInput(currentEvent.title);
+      setTimeInput(currentEvent.time ?? "");
+      setDetailInput(currentEvent.detail);
+    }
+  }, [currentEvent?.title, currentEvent?.time, currentEvent?.detail]);
+
+  const handleToggleEdit = () => {
+    // 저장 단계
+    if (isEditing && id && date) {
+      const updated = {
+        id: id as string,
+        date: date as string,
+        title: titleInput.trim(),
+        time: timeInput.trim(),
+        detail: detailInput.trim(),
+      };
+      updateEvent(updated);
+    }
+    setIsEditing((prev) => !prev);
+  };
 
   const handleDelete = () => {
     if (!id) return;
@@ -60,14 +105,23 @@ export default function EventDetailScreen() {
 
           <Text style={styles.headerTitle}>일정 상세</Text>
 
-          {/* 오른쪽 쓰레기통 아이콘 (삭제) */}
-          <TouchableOpacity onPress={handleDelete} disabled={!id}>
-            <Ionicons
-              name="trash-outline"
-              size={20}
-              color={id ? "#ff4d4f" : "#ccc"}
-            />
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            {/* 편집/저장 버튼 */}
+            <TouchableOpacity onPress={handleToggleEdit}>
+              <Text style={[styles.editText, isEditing && styles.editActive]}>
+                {isEditing ? "저장" : "편집"}
+              </Text>
+            </TouchableOpacity>
+
+            {/* 삭제 아이콘 (오른쪽 상단) */}
+            <TouchableOpacity
+              onPress={handleDelete}
+              disabled={!id}
+              style={styles.trashButton}
+            >
+              <Feather name="trash-2" size={18} color={"#ff4d4f"} />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* 내용 카드 */}
@@ -76,11 +130,31 @@ export default function EventDetailScreen() {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.card}>
-            {/* 제목 */}
-            <Text style={styles.title}>
-              {time ? `${formatKoreanTime(time)} ` : ""}
-              {title}
-            </Text>
+            {/* 제목 / 시간 */}
+            {isEditing ? (
+              <>
+                <Text style={styles.label}>제목</Text>
+                <TextInput
+                  value={titleInput}
+                  onChangeText={setTitleInput}
+                  placeholder="제목을 입력하세요"
+                  style={styles.input}
+                />
+
+                <Text style={[styles.label, { marginTop: 14 }]}>시간</Text>
+                <TextInput
+                  value={timeInput}
+                  onChangeText={setTimeInput}
+                  placeholder="예) 14:00"
+                  style={[styles.input, { marginBottom: 5 }]}
+                />
+              </>
+            ) : (
+              <Text style={styles.title}>
+                {timeInput ? `${formatKoreanTime(timeInput)} ` : ""}
+                {titleInput}
+              </Text>
+            )}
 
             {/* 날짜 뱃지 */}
             {!!date && (
@@ -95,8 +169,18 @@ export default function EventDetailScreen() {
             <View style={styles.divider} />
 
             {/* 상세 내용 섹션 */}
-            <Text style={styles.sectionLabel}>상세 내용</Text>
-            <Text style={styles.detail}>{detail}</Text>
+            {isEditing ? (
+              <TextInput
+                value={detailInput}
+                onChangeText={setDetailInput}
+                placeholder="상세 내용을 입력하세요"
+                style={[styles.input, styles.detailInput]}
+                multiline
+                textAlignVertical="top"
+              />
+            ) : (
+              <Text style={styles.detail}>{detailInput}</Text>
+            )}
           </View>
         </ScrollView>
       </View>
@@ -173,5 +257,39 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
     color: "#333",
+  },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  editText: {
+    fontSize: 13,
+    color: "#4a6aff",
+    padding: 3,
+  },
+  editActive: {
+    fontWeight: "700",
+  },
+  trashButton: {
+    marginLeft: 12,
+    padding: 3,
+  },
+  label: {
+    fontSize: 13,
+    marginBottom: 4,
+    color: "#555",
+    fontWeight: "600",
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 14,
+    backgroundColor: "#fafafa",
+  },
+  detailInput: {
+    minHeight: 100,
   },
 });
