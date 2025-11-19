@@ -208,10 +208,6 @@ export default function CalendarScreen() {
               있습니다.
             </Text>
           </View>
-
-          <View style={styles.summaryBadge}>
-            <Text style={styles.summaryBadgeText}>Today</Text>
-          </View>
         </View>
         {/* 헤더: 년/월 + 이전/다음 버튼 */}
         <View style={styles.header}>
@@ -268,16 +264,20 @@ export default function CalendarScreen() {
                       onPress={() => handlePressDay(day)}
                       disabled={!day}
                     >
-                      <Text
-                        style={[
-                          styles.dayText,
-                          !!isToday && styles.todayCell,
-                          !isToday && isSelected && styles.selectedCell,
-                          day === null && styles.dayEmpty,
-                        ]}
+                      <View
+                        style={!isToday && isSelected && styles.selectedCell}
                       >
-                        {day ?? ""}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.dayText,
+                            !!isToday && styles.todayCell,
+
+                            day === null && styles.dayEmpty,
+                          ]}
+                        >
+                          {day ?? ""}
+                        </Text>
+                      </View>
 
                       {/* 이벤트가 있으면 점 표시 */}
                       {hasEvent && <View style={styles.eventDot} />}
@@ -476,13 +476,13 @@ const styles = StyleSheet.create({
 
   // 선택된 날짜
   selectedCell: {
-    width: 25,
-    height: 25,
+    width: "100%",
+    height: "100%",
+    justifyContent: "center",
+    alignItems: "center",
     textAlign: "center",
-    lineHeight: 25,
     color: "white",
-    backgroundColor: "#999",
-    borderRadius: "50%",
+    backgroundColor: "#e2e2e2",
   },
 
   // 아래 일정 목록
@@ -597,17 +597,6 @@ const styles = StyleSheet.create({
   summaryHighlight: {
     fontWeight: "700",
     color: "#ff6b6b",
-  },
-  summaryBadge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    backgroundColor: "#eef3ff",
-  },
-  summaryBadgeText: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#4a6aff",
   },
   summaryBrandRow: {
     flexDirection: "row",
