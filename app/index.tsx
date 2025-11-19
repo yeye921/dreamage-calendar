@@ -1,4 +1,4 @@
-import { eventsAtom, EventType } from "@/atoms/events";
+import { eventsAtom, EventType, removeEventAtom } from "@/atoms/events";
 import { WEEK_LABELS } from "@/constants/date";
 import formatKoreanDate from "@/utils/formatKoreanDate";
 import { useRouter } from "expo-router";
@@ -65,6 +65,7 @@ export default function CalendarScreen() {
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
   const [events] = useAtom(eventsAtom); // 전역 일정
+  const [, removeEvent] = useAtom(removeEventAtom);
 
   // 선택된 날짜 ("YYYY-MM-DD")
   const [selectedDate, setSelectedDate] = useState<string | null>(
@@ -94,7 +95,7 @@ export default function CalendarScreen() {
       map[ev.date].push(ev);
     });
     return map;
-  }, []);
+  }, [events]);
 
   // 선택된 날짜의 일정 목록
   const selectedDateEvents = useMemo(() => {
@@ -178,6 +179,7 @@ export default function CalendarScreen() {
             </Text>
           </View>
         </View>
+
         {/* 헤더: 년/월 + 이전/다음 버튼 */}
         <View style={styles.header}>
           <TouchableOpacity onPress={goPrevMonth}>
@@ -228,25 +230,24 @@ export default function CalendarScreen() {
                   return (
                     <TouchableOpacity
                       key={index}
-                      style={styles.dayCell}
+                      style={[
+                        styles.dayCell,
+                        isSelected && styles.selectedCell,
+                      ]}
                       activeOpacity={day ? 0.7 : 1}
                       onPress={() => handlePressDay(day)}
                       disabled={!day}
                     >
-                      <View
-                        style={!isToday && isSelected && styles.selectedCell}
-                      >
-                        <Text
-                          style={[
-                            styles.dayText,
-                            !!isToday && styles.todayCell,
+                      <Text
+                        style={[
+                          styles.dayText,
+                          !!isToday && styles.todayCell,
 
-                            day === null && styles.dayEmpty,
-                          ]}
-                        >
-                          {day ?? ""}
-                        </Text>
-                      </View>
+                          day === null && styles.dayEmpty,
+                        ]}
+                      >
+                        {day ?? ""}
+                      </Text>
 
                       {/* 이벤트가 있으면 점 표시 */}
                       {hasEvent && <View style={styles.eventDot} />}
@@ -260,11 +261,27 @@ export default function CalendarScreen() {
 
         {/* 선택된 날짜의 일정 목록 */}
         <View style={styles.listContainer}>
-          <Text style={styles.sectionTitle}>
-            {selectedDate
-              ? `${formatKoreanDate(selectedDate)} 일정`
-              : "날짜를 선택하세요"}
-          </Text>
+          <View style={styles.listHeaderRow}>
+            <Text style={styles.sectionTitle}>
+              {selectedDate
+                ? `${formatKoreanDate(selectedDate)} 일정`
+                : "날짜를 선택하세요"}
+            </Text>
+
+            {/* 새 일정 추가 버튼 (event-form 화면으로 이동) */}
+            <TouchableOpacity
+              onPress={() =>
+                router.push({
+                  pathname: "/event-form",
+                  params: {
+                    date: selectedDate ?? todayKey,
+                  },
+                })
+              }
+            >
+              <Text style={styles.addButtonText}>+ 새 일정</Text>
+            </TouchableOpacity>
+          </View>
 
           {selectedDateEvents.length === 0 ? (
             <Text style={styles.emptyText}>일정이 없습니다.</Text>
@@ -459,6 +476,12 @@ const styles = StyleSheet.create({
     flex: 1,
     marginTop: 20,
   },
+  listHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "700",
@@ -466,6 +489,11 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     color: "#999",
+  },
+  addButtonText: {
+    fontSize: 13,
+    color: "#4a6aff",
+    fontWeight: "600",
   },
 
   // FlatList 전체 패딩
